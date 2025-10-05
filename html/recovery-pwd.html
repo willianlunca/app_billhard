@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Redefinir senha</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background:#f7f7f7; }
+    .card { max-width: 420px; margin: 8vh auto; background:#fff; padding: 24px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    label { display:block; font-size:14px; margin: 12px 0 6px; }
+    input { width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:16px; }
+    button { margin-top:16px; width:100%; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:16px; cursor:pointer; }
+    .primary { background:#006A4E; color:#fff; }
+    .muted { color:#666; font-size:13px; margin-top:10px; text-align:center; }
+    .alert { padding:10px 12px; border-radius:8px; margin-bottom:12px; font-size:14px; }
+    .ok { background:#e7f6ee; color:#106b37; }
+    .err { background:#fdecec; color:#a12727; }
+    .hide { display:none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Definir nova senha</h1>
+    <div id="msg" class="alert hide"></div>
+    <form id="form">
+      <label>Nova senha</label>
+      <input id="p1" type="password" minlength="6" required />
+      <label>Confirmar senha</label>
+      <input id="p2" type="password" minlength="6" required />
+      <button class="primary" type="submit">Salvar senha</button>
+    </form>
+    <p class="muted">Caso o link esteja expirado, solicite um novo e-mail.</p>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    // 🔧 Troque pelos do seu projeto
+    const SUPABASE_URL = 'https://SUA-URL-PROJETO.supabase.co'
+    const SUPABASE_ANON_KEY = 'SEU_ANON_KEY'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    const msg = document.getElementById('msg')
+    const show = (text, ok=false) => {
+      msg.textContent = text
+      msg.className = 'alert ' + (ok ? 'ok' : 'err')
+    }
+    const hide = () => { msg.className = 'alert hide'; }
+
+    // 1) Recupera credenciais do link
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code') // fluxo PKCE
+    const hash = new URLSearchParams(window.location.hash.slice(1)) // fluxo access_token/refresh_token
+    const access_token = hash.get('access_token')
+    const refresh_token = hash.get('refresh_token')
+
+    try {
+      // 2) Cria sessão a partir do link
+      if (code) {
+        // Novo padrão: ?code=...
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error || !data?.session) throw error || new Error('Falha ao criar sessão.')
+      } else if (access_token && refresh_token) {
+        // Padrão antigo com fragmento #access_token=...
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+        if (error) throw error
+      } else {
+        throw new Error('Link inválido ou incompleto.')
+      }
+
+      // 3) Habilita o formulário
+      hide()
+      const form = document.getElementById('form')
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        hide()
+        const p1 = document.getElementById('p1').value
+        const p2 = document.getElementById('p2').value
+        if (p1.length < 6) return show('A senha deve ter ao menos 6 caracteres.')
+        if (p1 !== p2)  return show('As senhas não coincidem.')
+
+        const { error } = await supabase.auth.updateUser({ password: p1 })
+        if (error) return show(error.message)
+
+        show('Senha alterada com sucesso! Você já pode voltar e entrar no app.', true)
+        // Opcional: deslogar e limpar hash
+        await supabase.auth.signOut()
+        history.replaceState(null, '', url.pathname) // limpa query/hash da URL
+        form.reset()
+      })
+    } catch (e) {
+      show(e.message || 'Não foi possível validar este link.')
+    }
+  </script>
+</body>
+</html>
