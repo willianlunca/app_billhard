@@ -1,5 +1,7 @@
 // menu.dart
 import 'package:app_billhard/colors/colors.dart';
+import 'package:app_billhard/screens/local.dart';
+import 'package:app_billhard/screens/termokip.dart';
 import 'package:flutter/material.dart';
 
 /// =============== WIDGET DO SEU MENU =================
@@ -9,6 +11,7 @@ class Menu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = const [
+      _MenuItem('Filial', Icons.location_city),
       _MenuItem('Equipamento', Icons.category),
       _MenuItem('Filiação', Icons.group),
     ];
@@ -36,6 +39,26 @@ class Menu extends StatelessWidget {
                 onTap: () {
                   // faça sua navegação aqui, se quiser
                   GlobalSideMenu.I.close();
+                  print('🟢 Clicou em: ${it.label}');
+                  // Ações específicas
+                  switch (it.label) {
+                    case 'Filial':
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const Local()),
+                      );
+                      break;
+
+                    case 'Equipamento':
+                      print('⚙️ Abrindo tela de Equipamentos...');
+                      break;
+
+                    case 'Filiação':
+                      print('👥 Abrindo tela de Filiação...');
+                      break;
+
+                    default:
+                      print('❓ Item não reconhecido.');
+                  }
                 },
               );
             },

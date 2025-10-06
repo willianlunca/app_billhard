@@ -2,96 +2,157 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Redefinir senha</title>
+  <title>Recuperar senha | Billhard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background:#f7f7f7; }
-    .card { max-width: 420px; margin: 8vh auto; background:#fff; padding: 24px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
-    h1 { font-size: 20px; margin: 0 0 16px; }
-    label { display:block; font-size:14px; margin: 12px 0 6px; }
-    input { width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:16px; }
-    button { margin-top:16px; width:100%; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:16px; cursor:pointer; }
-    .primary { background:#006A4E; color:#fff; }
-    .muted { color:#666; font-size:13px; margin-top:10px; text-align:center; }
-    .alert { padding:10px 12px; border-radius:8px; margin-bottom:12px; font-size:14px; }
-    .ok { background:#e7f6ee; color:#106b37; }
-    .err { background:#fdecec; color:#a12727; }
-    .hide { display:none; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; background: #f6f7f8; }
+    .card { max-width: 440px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+    .row { display: flex; gap: 12px; }
+    .input { width: 100%; padding: 12px 14px; border: 1px solid #d9d9d9; border-radius: 8px; font-size: 16px; }
+    .btn { appearance: none; border: 0; border-radius: 8px; padding: 12px 16px; font-size: 16px; cursor: pointer; background: #A94B2F; color: #fff; width: 100%; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .muted { color: #666; font-size: 14px; }
+    .ok { color: #0a7f4b; }
+    .err { color: #c62828; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Definir nova senha</h1>
-    <div id="msg" class="alert hide"></div>
-    <form id="form">
+    <h2>Redefinir senha</h2>
+    <p id="status" class="muted">Validando link de recuperaÃ§Ã£oâ€¦</p>
+
+    <div id="form-wrap" class="hidden">
       <label>Nova senha</label>
-      <input id="p1" type="password" minlength="6" required />
-      <label>Confirmar senha</label>
-      <input id="p2" type="password" minlength="6" required />
-      <button class="primary" type="submit">Salvar senha</button>
-    </form>
-    <p class="muted">Caso o link esteja expirado, solicite um novo e-mail.</p>
+      <input id="pwd1" class="input" type="password" placeholder="Digite a nova senha" autocomplete="new-password" />
+      <div style="height: 8px"></div>
+      <label>Confirmar nova senha</label>
+      <input id="pwd2" class="input" type="password" placeholder="Repita a nova senha" autocomplete="new-password" />
+      <div style="height: 16px"></div>
+      <button id="btn-save" class="btn">Salvar nova senha</button>
+      <p id="hint" class="muted">A senha deve atender aos requisitos mÃ­nimos definidos pelo seu app.</p>
+    </div>
   </div>
 
+  <!-- Supabase JS v2 pelo esm.sh -->
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-    // 🔧 Troque pelos do seu projeto
-    const SUPABASE_URL = 'https://SUA-URL-PROJETO.supabase.co'
-    const SUPABASE_ANON_KEY = 'SEU_ANON_KEY'
+    // ðŸ”§ Ajuste se necessÃ¡rio
+    const SUPABASE_URL = 'https://api.billhard.com.br'  // seu gateway (Kong) ou domÃ­nio do Supabase
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE'       // coloque sua ANON KEY
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    const msg = document.getElementById('msg')
-    const show = (text, ok=false) => {
-      msg.textContent = text
-      msg.className = 'alert ' + (ok ? 'ok' : 'err')
+    // UtilitÃ¡rio: lÃª params da querystring (?token=...&type=...)
+    function getQueryParams() {
+      const qs = new URLSearchParams(window.location.search)
+      const token = qs.get('token') || ''
+      const type  = qs.get('type')  || ''
+      const redirect_to = qs.get('redirect_to') || ''
+      return { token, type, redirect_to }
     }
-    const hide = () => { msg.className = 'alert hide'; }
 
-    // 1) Recupera credenciais do link
-    const url = new URL(window.location.href)
-    const code = url.searchParams.get('code') // fluxo PKCE
-    const hash = new URLSearchParams(window.location.hash.slice(1)) // fluxo access_token/refresh_token
-    const access_token = hash.get('access_token')
-    const refresh_token = hash.get('refresh_token')
+    // (Opcional) tambÃ©m verifica se veio algo no fragmento (#access_token=... etc.)
+    function getHashParams() {
+      const hash = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash)
+      // Ex.: access_token, refresh_token, expires_in, token_type, type, code, etc.
+      return Object.fromEntries(hash.entries())
+    }
 
-    try {
-      // 2) Cria sessão a partir do link
-      if (code) {
-        // Novo padrão: ?code=...
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error || !data?.session) throw error || new Error('Falha ao criar sessão.')
-      } else if (access_token && refresh_token) {
-        // Padrão antigo com fragmento #access_token=...
-        const { error } = await supabase.auth.setSession({ access_token, refresh_token })
-        if (error) throw error
-      } else {
-        throw new Error('Link inválido ou incompleto.')
+    const $ = sel => document.querySelector(sel)
+    const statusEl = $('#status')
+    const formWrap = $('#form-wrap')
+    const btnSave  = $('#btn-save')
+    const pwd1     = $('#pwd1')
+    const pwd2     = $('#pwd2')
+    const hint     = $('#hint')
+
+    async function main() {
+      const { token, type } = getQueryParams()
+      const hashParams = getHashParams()
+
+      // 1) Caso clÃ¡ssico: link de recuperaÃ§Ã£o com ?token=...&type=recovery
+      if (type === 'recovery' && token) {
+        try {
+          statusEl.textContent = 'Validando token de recuperaÃ§Ã£oâ€¦'
+
+          // Supabase JS v2: verificar o token recebido via redirect (usa token_hash)
+          const { data, error } = await supabase.auth.verifyOtp({
+            type: 'recovery',
+            token_hash: token,  // recebe exatamente o valor do ?token=...
+          })
+
+          if (error) throw error
+
+          // Se deu certo, jÃ¡ temos uma sessÃ£o vÃ¡lida para o usuÃ¡rio redefinir a senha
+          statusEl.textContent = 'Link validado. Defina sua nova senha abaixo.'
+          statusEl.classList.add('ok')
+          formWrap.classList.remove('hidden')
+        } catch (err) {
+          console.error(err)
+          statusEl.textContent = 'Link invÃ¡lido ou expirado. Solicite uma nova recuperaÃ§Ã£o de senha.'
+          statusEl.classList.add('err')
+        }
+        return
       }
 
-      // 3) Habilita o formulário
-      hide()
-      const form = document.getElementById('form')
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault()
-        hide()
-        const p1 = document.getElementById('p1').value
-        const p2 = document.getElementById('p2').value
-        if (p1.length < 6) return show('A senha deve ter ao menos 6 caracteres.')
-        if (p1 !== p2)  return show('As senhas não coincidem.')
+      // 2) Alternativo: alguns provedores mandam tokens no #fragment (ex.: access_token/refresh_token)
+      if (hashParams.access_token || hashParams.code) {
+        // Em alguns fluxos vocÃª pode trocar o "code" por sessÃ£o:
+        // await supabase.auth.exchangeCodeForSession(window.location.href)
+        // ou apenas prosseguir se jÃ¡ houver access_token vÃ¡lido no hash
+        statusEl.textContent = 'SessÃ£o detectada pelo fragmento da URL. Defina sua nova senha.'
+        statusEl.classList.add('ok')
+        formWrap.classList.remove('hidden')
+        return
+      }
 
-        const { error } = await supabase.auth.updateUser({ password: p1 })
-        if (error) return show(error.message)
-
-        show('Senha alterada com sucesso! Você já pode voltar e entrar no app.', true)
-        // Opcional: deslogar e limpar hash
-        await supabase.auth.signOut()
-        history.replaceState(null, '', url.pathname) // limpa query/hash da URL
-        form.reset()
-      })
-    } catch (e) {
-      show(e.message || 'Não foi possível validar este link.')
+      // 3) Nada encontrado
+      statusEl.textContent = 'NÃ£o encontrei um token de recuperaÃ§Ã£o na URL.'
+      statusEl.classList.add('err')
     }
+
+    btnSave.addEventListener('click', async () => {
+      const p1 = pwd1.value.trim()
+      const p2 = pwd2.value.trim()
+      if (!p1 || !p2) {
+        hint.textContent = 'Preencha os dois campos de senha.'
+        return
+      }
+      if (p1 !== p2) {
+        hint.textContent = 'As senhas nÃ£o coincidem.'
+        return
+      }
+
+      btnSave.disabled = true
+      hint.textContent = 'Salvandoâ€¦'
+
+      try {
+        // Atualiza a senha do usuÃ¡rio logado (sessÃ£o criada ao validar o token)
+        const { data, error } = await supabase.auth.updateUser({ password: p1 })
+        if (error) throw error
+
+        // Ok!
+        $('#status').textContent = 'Senha redefinida com sucesso. VocÃª jÃ¡ pode entrar no app.'
+        $('#status').classList.remove('err')
+        $('#status').classList.add('ok')
+        formWrap.classList.add('hidden')
+
+        // Opcional: redirecionar para sua pÃ¡gina de login
+        // window.location.href = '/login.html'
+      } catch (err) {
+        console.error(err)
+        hint.textContent = 'Falha ao salvar nova senha. Tente novamente.'
+        statusEl.textContent = 'Erro ao atualizar a senha.'
+        statusEl.classList.add('err')
+      } finally {
+        btnSave.disabled = false
+      }
+    })
+
+    // Executa ao carregar
+    main()
   </script>
 </body>
 </html>

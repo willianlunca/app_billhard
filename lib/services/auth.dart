@@ -1,3 +1,4 @@
+import 'package:app_billhard/screens/local.dart';
 import 'package:app_billhard/screens/login.dart';
 import 'package:app_billhard/screens/termokip.dart';
 import 'package:app_billhard/services/splashVideo.dart';
@@ -48,7 +49,7 @@ class AuthSupabase {
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const Live()),
+          MaterialPageRoute(builder: (_) => const Local()),
         );
       }
     } on AuthException catch (error) {
@@ -226,7 +227,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (session == null) {
           return const Login(); // usuário não logado
         } else {
-          return const Live(); // usuário logado
+          return const Local(); // usuário logado
         }
       },
     );
